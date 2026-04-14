@@ -108,7 +108,7 @@ if authentication_status:
                 supabase.table("registro_habitos").delete().eq("username", username).eq("habito", h_borrar).execute()
                 st.rerun()
 
-    st.title("📟 NIVEL CERO: SISTEMA AUTÓNOMO")
+    st.title("📟 NIVEL CERO: HABIT TRACKER")
     
     # Matriz
     if not habitos_lista:
