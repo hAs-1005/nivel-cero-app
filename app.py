@@ -33,13 +33,22 @@ if authentication_status:
 
     # --- FUNCIONES DE BASE DE DATOS ---
     def get_habitos(user):
-        res = supabase.table("registro_habitos").select("*").eq("username", user).execute()
-        if res.data:
-            df = pd.DataFrame(res.data)
-            df['fecha'] = pd.to_datetime(df['fecha']).dt.date
-            return df.pivot(index='fecha', columns='habito', values='completado').reset_index()
-        return pd.DataFrame(columns=["fecha"])
-
+        try:
+            # Añadimos un bloque try/except para capturar el error exacto
+            res = supabase.table("registro_habitos").select("*").eq("username", user).execute()
+            
+            # Verificamos que realmente haya datos antes de procesar
+            if res.data and len(res.data) > 0:
+                df = pd.DataFrame(res.data)
+                df['fecha'] = pd.to_datetime(df['fecha']).dt.date
+                return df.pivot(index='fecha', columns='habito', values='completado').reset_index()
+            
+            return pd.DataFrame(columns=["fecha"])
+        except Exception as e:
+            # Esto nos dirá en la pantalla de la app QUÉ está fallando
+            st.error(f"Error técnico de conexión: {e}")
+            return pd.DataFrame(columns=["fecha"])
+            
     def get_finanzas(user):
         res = supabase.table("finanzas").select("*").eq("username", user).execute()
         return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["fecha", "concepto", "monto", "tipo"])
