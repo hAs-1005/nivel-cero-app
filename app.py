@@ -16,17 +16,67 @@ except:
     st.error("Faltan las llaves en Secrets.")
     st.stop()
 
-# --- 2. AUTENTICACIÓN ---
-names = ['Usuario Maestro']
-usernames = ['admin']
-passwords = ['admin123'] 
+# --- 2. LÓGICA DE USUARIOS DESDE LA NUBE ---
+def registrar_usuario(user, pw, nombre):
+    # Encriptamos la contraseña por seguridad de ingeniería
+    hashed_pw = stauth.Hasher([pw]).generate()[0]
+    try:
+        supabase.table("usuarios").insert({
+            "username": user, 
+            "password_hash": hashed_pw, 
+            "name": nombre
+        }).execute()
+        return True
+    except Exception as e:
+        return False
 
+def obtener_usuarios_db():
+    try:
+        res = supabase.table("usuarios").select("*").execute()
+        db_users = {}
+        if res.data:
+            for u in res.data:
+                db_users[u['username']] = {
+                    'name': u['name'],
+                    'password': u['password_hash']
+                }
+        return db_users
+    except:
+        return {}
+
+# Cargamos los usuarios registrados en Supabase
+config_dict = {'usernames': obtener_usuarios_db()}
+
+# Importante: Cambiamos el nombre de la cookie para refrescar la sesión
 authenticator = stauth.Authenticate(
-    {'usernames': {usernames[0]: {'name': names[0], 'password': passwords[0]}}},
-    'nivel_cero_cloud', 'auth_key', cookie_expiry_days=30
+    config_dict,
+    'nivel_cero_auto_registro', 'key_auto', cookie_expiry_days=30
 )
 
-name, authentication_status, username = authenticator.login('main')
+# --- 3. INTERFAZ DE ACCESO (TABS) ---
+tab_login, tab_signup = st.tabs(["🔑 Iniciar Sesión", "📝 Crear Cuenta"])
+
+with tab_signup:
+    st.subheader("Únete a Nivel Cero")
+    new_user = st.text_input("Usuario (ID único):", key="reg_user")
+    new_name = st.text_input("Tu Nombre real:", key="reg_name")
+    new_pw = st.text_input("Contraseña:", type="password", key="reg_pw")
+    if st.button("Registrarme ahora"):
+        if new_user and new_pw and new_name:
+            if registrar_usuario(new_user, new_pw, new_name):
+                st.success("¡Cuenta creada exitosamente! Ahora ve a la pestaña de Iniciar Sesión.")
+                st.balloons()
+            else:
+                st.error("Error: El usuario ya existe o hubo un problema con la base de datos.")
+        else:
+            st.warning("Por favor, completa todos los campos.")
+
+with tab_login:
+    name, authentication_status, username = authenticator.login('main')
+
+# --- 4. CONTINUACIÓN DEL PROGRAMA ---
+if authentication_status:
+    # A partir de aquí mantienes todo tu código original (st.set_page_config, get_habitos, etc.)
 
 if authentication_status:
     st.set_page_config(page_title="Nivel Cero - Cloud Pro", layout="wide")
