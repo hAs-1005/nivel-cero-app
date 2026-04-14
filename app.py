@@ -62,17 +62,39 @@ if authentication_status:
     año_act = hoy.year
     dias_mes = calendar.monthrange(año_act, mes_act)[1]
 
-    # --- SIDEBAR ---
+    # --- SIDEBAR ACTUALIZADA ---
     with st.sidebar:
         st.write(f"👷 Ingeniero: **{name}**")
         authenticator.logout('Cerrar Sesión', 'sidebar')
         st.divider()
+        
         with st.expander("➕ Nuevo Hábito"):
-            n_hab = st.text_input("Nombre:")
-            emo = st.selectbox("Emoji:", ["📚", "💪", "💰", "🏗️", "🛹", "🎯", "🚿"])
-            if st.button("Añadir"):
-                supabase.table("registro_habitos").insert({"username": username, "fecha": str(hoy), "habito": f"{emo} {n_hab}", "completado": False}).execute()
-                st.rerun()
+            n_hab = st.text_input("Nombre del hábito:")
+            
+            # Biblioteca rápida de sugerencias
+            st.caption("Sugerencias:")
+            col_e1, col_e2, col_e3, col_e4 = st.columns(4)
+            with col_e1: st.code("🏗️ 🧱 📏")
+            with col_e2: st.code("📉 💰 💳")
+            with col_e3: st.code("🏃 🥗 💧")
+            with col_e4: st.code("📖 ✍️ 💻")
+            
+            # Entrada libre para cualquier emoji
+            emo = st.text_input("Pega aquí tu Emoji (Win + . en PC):", value="✨")
+            
+            if st.button("Añadir a la Nube"):
+                if n_hab:
+                    # Insertamos en Supabase
+                    supabase.table("registro_habitos").insert({
+                        "username": username, 
+                        "fecha": str(hoy), 
+                        "habito": f"{emo} {n_hab}", 
+                        "completado": False
+                    }).execute()
+                    st.success(f"Hábito '{n_hab}' creado")
+                    st.rerun()
+                else:
+                    st.warning("Escribe un nombre para el hábito.")
         
         if habitos_lista:
             st.divider()
