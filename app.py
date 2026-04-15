@@ -188,13 +188,19 @@ if authentication_status:
                 if not match.empty and habito in match.columns:
                     val = bool(match.iloc[0][habito])
                 
-                with cols[d]:
+               with cols[d]:
                     check = st.checkbox("", value=val, key=f"{habito}_{d}")
                     if check != val:
-                        supabase.table("registro_habitos").upsert({
-                            "username": username, "fecha": str(f_celda), 
-                            "habito": habito, "completado": check
-                        }).execute()
+                        # Usamos upsert con la restricción de unicidad
+                        try:
+                            supabase.table("registro_habitos").upsert({
+                                "username": username, 
+                                "fecha": str(f_celda), 
+                                "habito": habito, 
+                                "completado": check
+                            }, on_conflict="username,fecha,habito").execute()
+                        except Exception as e:
+                            st.error(f"Error al sincronizar: {e}")
 
     # Gráficos
     mostrar_graficos(data_db, habitos_lista)
