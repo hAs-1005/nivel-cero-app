@@ -248,16 +248,16 @@ if authentication_status:
             mi_score = ranking_data.get(username, 0)
             
             if mi_score >= 90:
-                st.write("🏅 **Rango: Ingeniero de Oro**")
+                st.write("🏅 **Rango: Oro**")
                 st.info("¡Eres una máquina! Estás en el nivel de élite.")
             elif mi_score >= 70:
-                st.write("🥈 **Rango: Residente Senior**")
+                st.write("🥈 **Rango: Plata**")
                 st.warning("Muy buena constancia, ¡sigue así!")
             elif mi_score >= 50:
-                st.write("🥉 **Rango: Supervisor de Obra**")
+                st.write("🥉 **Rango: Bronce**")
                 st.write("Estás en el camino, pero falta apretar el paso.")
             else:
-                st.write("👷 **Rango: Ayudante en Prácticas**")
+                st.write("👷 **Rango: Papel Higienico**")
                 st.error("¡Cuidado! Tu consistencia está baja.")
     else:
         st.info("Aún no hay suficientes datos para generar el ranking.")
