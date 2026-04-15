@@ -84,6 +84,7 @@ with tab_login:
 
 # --- 4. PANEL PRINCIPAL ---
 if authentication_status:
+    # Configuración de página movida aquí para evitar errores de ejecución
     st.set_page_config(page_title="Nivel Cero - Cloud Pro", layout="wide")
 
     def get_habitos(user):
@@ -162,4 +163,20 @@ if authentication_status:
             supabase.table("finanzas").insert({"username": username, "monto": m_in, "concepto": d_in, "tipo": "Ingreso", "fecha": str(hoy)}).execute()
             st.rerun()
     with f2:
-        m_ga = st.number_input("Gasto
+        m_ga = st.number_input("Gasto:", min_value=0.0, key="fin_ga")
+        d_ga = st.text_input("Concepto:", key="src_ga")
+        if st.button("➖ Gasto"):
+            supabase.table("finanzas").insert({"username": username, "monto": m_ga, "concepto": d_ga, "tipo": "Gasto", "fecha": str(hoy)}).execute()
+            st.rerun()
+    with f3:
+        m_ah = st.number_input("Ahorro:", min_value=0.0, key="fin_ah")
+        if st.button("🎯 Ahorro"):
+            supabase.table("finanzas").insert({"username": username, "monto": m_ah, "concepto": "Ahorro", "tipo": "Ahorro", "fecha": str(hoy)}).execute()
+            st.rerun()
+
+    ti, tg, ta = finanzas_db[finanzas_db['tipo'] == 'Ingreso']['monto'].sum(), finanzas_db[finanzas_db['tipo'] == 'Gasto']['monto'].sum(), finanzas_db[finanzas_db['tipo'] == 'Ahorro']['monto'].sum()
+    st.metric("Saldo Disponible", f"${ti - tg - ta:,.2f}")
+    
+    if not finanzas_db.empty:
+        with st.expander("📂 Ver Historial"):
+            st.dataframe(finanzas_db[['fecha', 'concepto', 'monto', 'tipo']], use_container_width=True)
