@@ -199,7 +199,7 @@ if authentication_status:
     # Gráficos
     mostrar_graficos(data_db, habitos_lista)
 
-    # --- 6. FINANZAS CLOUD ---
+    # --- 6. FINANZAS CLOUD (VERSIÓN BLINDADA) ---
     st.divider()
     st.header("💰 FINANZAS CLOUD")
     f1, f2, f3 = st.columns(3)
@@ -209,29 +209,55 @@ if authentication_status:
         d_in = st.text_input("Fuente:", key="src_in")
         if st.button("➕ Ingreso"):
             if m_in > 0:
-                supabase.table("finanzas").insert({"username": username, "monto": m_in, "concepto": d_in, "tipo": "Ingreso", "fecha": str(hoy)}).execute()
-                st.rerun()
+                try:
+                    supabase.table("finanzas").insert({
+                        "username": username, "monto": m_in, "concepto": d_in, 
+                        "tipo": "Ingreso", "fecha": str(hoy)
+                    }).execute()
+                    st.success("✅ Ingreso registrado")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error de base de datos: {e}")
 
     with f2:
         m_ga = st.number_input("Gasto:", min_value=0.0, key="fin_ga")
         d_ga = st.text_input("Concepto:", key="src_ga")
         if st.button("➖ Gasto"):
             if m_ga > 0:
-                supabase.table("finanzas").insert({"username": username, "monto": m_ga, "concepto": d_ga, "tipo": "Gasto", "fecha": str(hoy)}).execute()
-                st.rerun()
+                try:
+                    supabase.table("finanzas").insert({
+                        "username": username, "monto": m_ga, "concepto": d_ga, 
+                        "tipo": "Gasto", "fecha": str(hoy)
+                    }).execute()
+                    st.success("✅ Gasto registrado")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error de base de datos: {e}")
 
     with f3:
         m_ah = st.number_input("Ahorro:", min_value=0.0, key="fin_ah")
         if st.button("🎯 Ahorro"):
             if m_ah > 0:
-                supabase.table("finanzas").insert({"username": username, "monto": m_ah, "concepto": "Ahorro", "tipo": "Ahorro", "fecha": str(hoy)}).execute()
-                st.rerun()
+                try:
+                    # AQUÍ ESTABA EL ERROR (LÍNEA 197)
+                    supabase.table("finanzas").insert({
+                        "username": username, "monto": m_ah, "concepto": "Ahorro", 
+                        "tipo": "Ahorro", "fecha": str(hoy)
+                    }).execute()
+                    st.success("✅ Ahorro registrado")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error de base de datos: {e}")
 
-    ti = finanzas_db[finanzas_db['tipo'] == 'Ingreso']['monto'].sum()
-    tg = finanzas_db[finanzas_db['tipo'] == 'Gasto']['monto'].sum()
-    ta = finanzas_db[finanzas_db['tipo'] == 'Ahorro']['monto'].sum()
-    st.metric("Saldo Disponible Real", f"${ti - tg - ta:,.2f}")
-    
+    # Cálculo de métricas (Protección contra datos vacíos)
     if not finanzas_db.empty:
-        with st.expander("📂 Historial"):
+        ti = finanzas_db[finanzas_db['tipo'] == 'Ingreso']['monto'].sum()
+        tg = finanzas_db[finanzas_db['tipo'] == 'Gasto']['monto'].sum()
+        ta = finanzas_db[finanzas_db['tipo'] == 'Ahorro']['monto'].sum()
+        st.metric("Saldo Disponible Real", f"${ti - tg - ta:,.2f}")
+        
+        with st.expander("📂 Historial de Movimientos"):
             st.dataframe(finanzas_db[['fecha', 'concepto', 'monto', 'tipo']].sort_values(by='fecha', ascending=False), use_container_width=True)
+    else:
+        st.metric("Saldo Disponible Real", "$0.00")
+        st.info("Aún no hay movimientos registrados.")
