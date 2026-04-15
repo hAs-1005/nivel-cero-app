@@ -82,4 +82,127 @@ tab_login, tab_signup = st.tabs(["🔑 Iniciar Sesión", "📝 Crear Cuenta"])
 
 with tab_signup:
     st.subheader("Únete a Nivel Cero")
-    new_user = st.
+    new_user = st.text_input("Usuario (ID único):", key="reg_user")
+    new_name = st.text_input("Tu Nombre real:", key="reg_name")
+    new_pw = st.text_input("Contraseña:", type="password", key="reg_pw")
+    if st.button("Registrarme ahora"):
+        if new_user and new_pw and new_name:
+            if registrar_usuario(new_user, new_pw, new_name):
+                st.success("¡Cuenta creada exitosamente! Ya puedes iniciar sesión.")
+                st.balloons()
+            else:
+                st.error("Error: El usuario ya existe.")
+        else:
+            st.warning("Completa todos los campos.")
+
+with tab_login:
+    name, authentication_status, username = authenticator.login('main')
+
+# --- 4. PANEL PRINCIPAL ---
+if authentication_status:
+    st.set_page_config(page_title="Nivel Cero - Cloud Pro", layout="wide")
+
+    def get_habitos(user):
+        try:
+            res = supabase.table("registro_habitos").select("*").eq("username", user).execute()
+            if res.data and len(res.data) > 0:
+                df = pd.DataFrame(res.data)
+                df['fecha'] = pd.to_datetime(df['fecha']).dt.date
+                return df.pivot(index='fecha', columns='habito', values='completado').reset_index()
+            return pd.DataFrame(columns=["fecha"])
+        except: return pd.DataFrame(columns=["fecha"])
+
+    def get_finanzas(user):
+        try:
+            res = supabase.table("finanzas").select("*").eq("username", user).execute()
+            return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["fecha", "concepto", "monto", "tipo"])
+        except: return pd.DataFrame(columns=["fecha", "concepto", "monto", "tipo"])
+
+    data_db = get_habitos(username)
+    finanzas_db = get_finanzas(username)
+    habitos_lista = [c for c in data_db.columns if c != "fecha"]
+    hoy = datetime.date.today()
+    mes_act, año_act = hoy.month, hoy.year
+    dias_mes = calendar.monthrange(año_act, mes_act)[1]
+
+    with st.sidebar:
+        st.write(f"👷 Bienvenido, **{name}**")
+        authenticator.logout('Cerrar Sesión', 'sidebar')
+        st.divider()
+        with st.expander("➕ Nuevo Hábito"):
+            n_hab = st.text_input("Nombre del Hábito:")
+            emo = st.text_input("Emoji:", value="✨")
+            if st.button("Añadir a la Nube"):
+                if n_hab:
+                    supabase.table("registro_habitos").insert({"username": username, "fecha": str(hoy), "habito": f"{emo} {n_hab}", "completado": False}).execute()
+                    st.rerun()
+        
+        if habitos_lista:
+            st.divider()
+            h_borrar = st.selectbox("🗑️ Eliminar Hábito", habitos_lista)
+            if st.button("Confirmar Borrado"):
+                supabase.table("registro_habitos").delete().eq("username", username).eq("habito", h_borrar).execute()
+                st.rerun()
+
+    st.title("📟 NIVEL CERO: HABIT TRACKER")
+    st.header(f"🗓️ {calendar.month_name[mes_act].upper()} {año_act}")
+    
+    if not habitos_lista:
+        st.info("Crea un hábito en la barra lateral para comenzar a trackear.")
+    else:
+        cols_h = st.columns([3.5] + [1] * dias_mes)
+        for d in range(1, dias_mes + 1): cols_h[d].write(f"**{d}**")
+        
+        for habito in habitos_lista:
+            cols = st.columns([3.5] + [1] * dias_mes)
+            cols[0].markdown(f"**{habito}**")
+            for d in range(1, dias_mes + 1):
+                f_celda = datetime.date(año_act, mes_act, d)
+                val = False
+                match = data_db[data_db['fecha'] == f_celda]
+                if not match.empty and habito in match.columns:
+                    val = bool(match.iloc[0][habito])
+                
+                with cols[d]:
+                    check = st.checkbox("", value=val, key=f"{habito}_{d}")
+                    if check != val:
+                        supabase.table("registro_habitos").upsert({
+                            "username": username, "fecha": str(f_celda), 
+                            "habito": habito, "completado": check
+                        }).execute()
+
+    # Invocamos la analítica completa
+    mostrar_graficos(data_db, habitos_lista)
+
+    st.divider()
+    st.header("💰 FINANZAS CLOUD")
+    f1, f2, f3 = st.columns(3)
+    with f1:
+        m_in = st.number_input("Monto Ingreso:", min_value=0.0, key="fin_in")
+        d_in = st.text_input("Fuente de ingreso:", key="src_in")
+        if st.button("➕ Registrar Ingreso"):
+            if m_in > 0:
+                supabase.table("finanzas").insert({"username": username, "monto": m_in, "concepto": d_in, "tipo": "Ingreso", "fecha": str(hoy)}).execute()
+                st.rerun()
+    with f2:
+        m_ga = st.number_input("Monto Gasto:", min_value=0.0, key="fin_ga")
+        d_ga = st.text_input("Concepto del gasto:", key="src_ga")
+        if st.button("➖ Registrar Gasto"):
+            if m_ga > 0:
+                supabase.table("finanzas").insert({"username": username, "monto": m_ga, "concepto": d_ga, "tipo": "Gasto", "fecha": str(hoy)}).execute()
+                st.rerun()
+    with f3:
+        m_ah = st.number_input("Monto Ahorro:", min_value=0.0, key="fin_ah")
+        if st.button("🎯 Registrar Ahorro"):
+            if m_ah > 0:
+                supabase.table("finanzas").insert({"username": username, "monto": m_ah, "concepto": "Ahorro", "tipo": "Ahorro", "fecha": str(hoy)}).execute()
+                st.rerun()
+
+    ti = finanzas_db[finanzas_db['tipo'] == 'Ingreso']['monto'].sum()
+    tg = finanzas_db[finanzas_db['tipo'] == 'Gasto']['monto'].sum()
+    ta = finanzas_db[finanzas_db['tipo'] == 'Ahorro']['monto'].sum()
+    st.metric("Saldo Disponible Real", f"${ti - tg - ta:,.2f}")
+    
+    if not finanzas_db.empty:
+        with st.expander("📂 Ver Historial de Movimientos"):
+            st.dataframe(finanzas_db[['fecha', 'concepto', 'monto', 'tipo']], use_container_width=True)
