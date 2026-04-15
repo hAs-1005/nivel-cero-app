@@ -16,7 +16,7 @@ except:
     st.error("Faltan las llaves en Secrets.")
     st.stop()
 
-# --- 2. FUNCIONES DE APOYO (LÓGICA SEPARADA) ---
+# --- 2. FUNCIONES DE APOYO ---
 
 def registrar_usuario(user, pw, nombre):
     hashed_pw = stauth.Hasher([pw]).generate()[0]
@@ -40,23 +40,17 @@ def obtener_usuarios_db():
         return {}
 
 def mostrar_graficos(df, habitos):
-    """Función modular para los gráficos. Fácil de editar sin romper el resto."""
     if habitos and not df.empty:
         st.divider()
         col1, col2 = st.columns([2, 1])
-        
         with col1:
-            # Gráfico de Líneas: Rendimiento Semanal
             df_plot = df.copy()
             df_plot['fecha'] = pd.to_datetime(df_plot['fecha'])
             df_plot['Semana'] = df_plot['fecha'].dt.isocalendar().week
             res_s = df_plot.groupby('Semana')[habitos].mean() * 100
             st.plotly_chart(px.line(res_s, markers=True, template="plotly_dark", 
-                                  title="Rendimiento Semanal %", labels={'value': 'Logro %'}), 
-                          use_container_width=True)
-            
+                                  title="Rendimiento Semanal %"), use_container_width=True)
         with col2:
-            # Gráfico de Dona: Score Global
             score = df[habitos].mean().mean() * 100
             fig = go.Figure(go.Pie(labels=['Logrado', 'Pendiente'], values=[score, 100-score], 
                                  hole=.7, marker_colors=['#00ffcc', '#333333']))
@@ -78,4 +72,94 @@ with tab_signup:
     if st.button("Registrarme ahora"):
         if new_user and new_pw and new_name:
             if registrar_usuario(new_user, new_pw, new_name):
-                st.success("¡Cuenta
+                st.success("¡Cuenta creada exitosamente! Ahora inicia sesión.")
+                st.balloons()
+            else:
+                st.error("Error: El usuario ya existe.")
+        else:
+            st.warning("Completa todos los campos.")
+
+with tab_login:
+    name, authentication_status, username = authenticator.login('main')
+
+# --- 4. PANEL PRINCIPAL ---
+if authentication_status:
+    st.set_page_config(page_title="Nivel Cero - Cloud Pro", layout="wide")
+
+    def get_habitos(user):
+        try:
+            res = supabase.table("registro_habitos").select("*").eq("username", user).execute()
+            if res.data and len(res.data) > 0:
+                df = pd.DataFrame(res.data)
+                df['fecha'] = pd.to_datetime(df['fecha']).dt.date
+                return df.pivot(index='fecha', columns='habito', values='completado').reset_index()
+            return pd.DataFrame(columns=["fecha"])
+        except: return pd.DataFrame(columns=["fecha"])
+
+    def get_finanzas(user):
+        res = supabase.table("finanzas").select("*").eq("username", user).execute()
+        return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["fecha", "concepto", "monto", "tipo"])
+
+    data_db = get_habitos(username)
+    finanzas_db = get_finanzas(username)
+    habitos_lista = [c for c in data_db.columns if c != "fecha"]
+    hoy = datetime.date.today()
+    mes_act, año_act = hoy.month, hoy.year
+    dias_mes = calendar.monthrange(año_act, mes_act)[1]
+
+    with st.sidebar:
+        st.write(f"👷 Bienvenido, **{name}**")
+        authenticator.logout('Cerrar Sesión', 'sidebar')
+        st.divider()
+        with st.expander("➕ Nuevo Hábito"):
+            n_hab = st.text_input("Nombre:")
+            emo = st.text_input("Emoji:", value="✨")
+            if st.button("Añadir"):
+                supabase.table("registro_habitos").insert({"username": username, "fecha": str(hoy), "habito": f"{emo} {n_hab}", "completado": False}).execute()
+                st.rerun()
+        
+        if habitos_lista:
+            h_borrar = st.selectbox("🗑️ Eliminar Hábito", habitos_lista)
+            if st.button("Confirmar Borrado"):
+                supabase.table("registro_habitos").delete().eq("username", username).eq("habito", h_borrar).execute()
+                st.rerun()
+
+    st.title("📟 NIVEL CERO: HABIT TRACKER")
+    
+    if not habitos_lista:
+        st.info("Crea un hábito para comenzar.")
+    else:
+        cols_h = st.columns([3.5] + [1] * dias_mes)
+        for d in range(1, dias_mes + 1): cols_h[d].write(f"**{d}**")
+        
+        for habito in habitos_lista:
+            cols = st.columns([3.5] + [1] * dias_mes)
+            cols[0].markdown(f"**{habito}**")
+            for d in range(1, dias_mes + 1):
+                f_celda = datetime.date(año_act, mes_act, d)
+                val = False
+                match = data_db[data_db['fecha'] == f_celda]
+                if not match.empty and habito in match.columns:
+                    val = bool(match.iloc[0][habito])
+                
+                with cols[d]:
+                    check = st.checkbox("", value=val, key=f"{habito}_{d}")
+                    if check != val:
+                        supabase.table("registro_habitos").upsert({
+                            "username": username, "fecha": str(f_celda), 
+                            "habito": habito, "completado": check
+                        }).execute()
+
+    mostrar_graficos(data_db, habitos_lista)
+
+    st.divider()
+    st.header("💰 FINANZAS CLOUD")
+    f1, f2, f3 = st.columns(3)
+    with f1:
+        m_in = st.number_input("Ingreso:", min_value=0.0, key="fin_in")
+        d_in = st.text_input("Fuente:", key="src_in")
+        if st.button("➕ Ingreso"):
+            supabase.table("finanzas").insert({"username": username, "monto": m_in, "concepto": d_in, "tipo": "Ingreso", "fecha": str(hoy)}).execute()
+            st.rerun()
+    with f2:
+        m_ga = st.number_input("Gasto
