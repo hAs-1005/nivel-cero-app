@@ -188,7 +188,7 @@ if authentication_status:
                 if not match.empty and habito in match.columns:
                     val = bool(match.iloc[0][habito])
                 
-               with cols[d]:
+            with cols[d]:
                     check = st.checkbox("", value=val, key=f"{habito}_{d}")
                     if check != val:
                         # Usamos upsert con la restricción de unicidad
