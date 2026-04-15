@@ -171,36 +171,45 @@ if authentication_status:
     st.title("📟 NIVEL CERO: HABIT TRACKER")
     st.header(f"🗓️ {calendar.month_name[mes_act].upper()} {año_act}")
     
-    # Matriz de Hábitos
+    # --- MATRIZ DE HÁBITOS REFORMADA ---
     if not habitos_lista:
         st.info("Crea un hábito en la barra lateral.")
     else:
-        cols_h = st.columns([3.5] + [1] * dias_mes)
-        for d in range(1, dias_mes + 1): cols_h[d].write(f"**{d}**")
+        # Reducimos un poco el espacio del nombre del hábito para darle más a los días
+        # Usamos columnas más pequeñas para los días
+        column_widths = [2.5] + [1] * dias_mes
+        cols_h = st.columns(column_widths)
         
+        # Encabezado de días
+        for d in range(1, dias_mes + 1): 
+            # Ponemos el número en pequeño para que no ocupe tanto espacio
+            cols_h[d].caption(f"**{d}**")
+        
+        # Filas de hábitos
         for habito in habitos_lista:
-            cols = st.columns([3.5] + [1] * dias_mes)
-            cols[0].markdown(f"**{habito}**")
+            cols = st.columns(column_widths)
+            # Usamos un contenedor para que el texto no se corte
+            cols[0].markdown(f"<div style='font-size: 0.9rem; font-weight: bold;'>{habito}</div>", unsafe_allow_html=True)
+            
             for d in range(1, dias_mes + 1):
                 f_celda = datetime.date(año_act, mes_act, d)
                 val = False
+                
                 match = data_db[data_db['fecha'] == f_celda]
                 if not match.empty and habito in match.columns:
                     val = bool(match.iloc[0][habito])
                 
-            with cols[d]:
-                    check = st.checkbox("", value=val, key=f"{habito}_{d}")
+                with cols[d]:
+                    # Usamos labels vacíos para que solo se vea el cuadrito
+                    check = st.checkbox("", value=val, key=f"{habito}_{d}", label_visibility="collapsed")
                     if check != val:
-                        # Usamos upsert con la restricción de unicidad
                         try:
                             supabase.table("registro_habitos").upsert({
-                                "username": username, 
-                                "fecha": str(f_celda), 
-                                "habito": habito, 
-                                "completado": check
+                                "username": username, "fecha": str(f_celda), 
+                                "habito": habito, "completado": check
                             }, on_conflict="username,fecha,habito").execute()
-                        except Exception as e:
-                            st.error(f"Error al sincronizar: {e}")
+                        except:
+                            pass
 
     # Gráficos
     mostrar_graficos(data_db, habitos_lista)
