@@ -93,6 +93,18 @@ def mostrar_graficos(df, habitos):
 
 # --- 3. INTERFAZ DE ACCESO ---
 config_dict = {'usernames': obtener_usuarios_db()}
+def obtener_ranking_global():
+    try:
+        # Traemos todos los registros de todos los usuarios
+        res = supabase.table("registro_habitos").select("username, completado").execute()
+        if res.data:
+            df = pd.DataFrame(res.data)
+            # Calculamos el promedio de cumplimiento por usuario
+            ranking = df.groupby("username")["completado"].mean() * 100
+            return ranking.sort_values(ascending=False)
+        return pd.Series()
+    except:
+        return pd.Series()
 authenticator = stauth.Authenticate(config_dict, 'nivel_cero_v5', 'key_v5', cookie_expiry_days=30)
 
 tab_login, tab_signup = st.tabs(["🔑 Iniciar Sesión", "📝 Crear Cuenta"])
