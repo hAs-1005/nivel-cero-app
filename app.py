@@ -227,6 +227,40 @@ if authentication_status:
                             st.error(f"Error: {e}")
     # Gráficos
     mostrar_graficos(data_db, habitos_lista)
+    # --- 🏆 SECCIÓN DE COMPETENCIA (GAMIFICACIÓN) ---
+    st.divider()
+    st.header("🏆 LIGA NIVEL CERO")
+    
+    ranking_data = obtener_ranking_global()
+    
+    if not ranking_data.empty:
+        col_rank, col_medalla = st.columns([2, 1])
+        
+        with col_rank:
+            st.subheader("Cuadro de Honor")
+            df_rank = ranking_data.reset_index()
+            df_rank.columns = ['Usuario', 'Consistencia %']
+            df_rank['Consistencia %'] = df_rank['Consistencia %'].map('{:.1f}%'.format)
+            st.table(df_rank)
+
+        with col_medalla:
+            st.subheader("Tu Estatus")
+            mi_score = ranking_data.get(username, 0)
+            
+            if mi_score >= 90:
+                st.write("🏅 **Rango: Ingeniero de Oro**")
+                st.info("¡Eres una máquina! Estás en el nivel de élite.")
+            elif mi_score >= 70:
+                st.write("🥈 **Rango: Residente Senior**")
+                st.warning("Muy buena constancia, ¡sigue así!")
+            elif mi_score >= 50:
+                st.write("🥉 **Rango: Supervisor de Obra**")
+                st.write("Estás en el camino, pero falta apretar el paso.")
+            else:
+                st.write("👷 **Rango: Ayudante en Prácticas**")
+                st.error("¡Cuidado! Tu consistencia está baja.")
+    else:
+        st.info("Aún no hay suficientes datos para generar el ranking.")
 
     # --- 6. FINANZAS CLOUD (VERSIÓN BLINDADA) ---
     st.divider()
