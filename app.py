@@ -200,17 +200,19 @@ if authentication_status:
                     val = bool(match.iloc[0][habito])
                 
                 with cols[d]:
-                    # Usamos labels vacíos para que solo se vea el cuadrito
                     check = st.checkbox("", value=val, key=f"{habito}_{d}", label_visibility="collapsed")
                     if check != val:
                         try:
+                            # 1. Enviamos el dato a Supabase
                             supabase.table("registro_habitos").upsert({
                                 "username": username, "fecha": str(f_celda), 
                                 "habito": habito, "completado": check
                             }, on_conflict="username,fecha,habito").execute()
-                        except:
-                            pass
-
+                            
+                            # 2. ¡CLAVE! Recargamos la app para que data_db se actualice y los gráficos cambien
+                            st.rerun() 
+                        except Exception as e:
+                            st.error(f"Error: {e}")
     # Gráficos
     mostrar_graficos(data_db, habitos_lista)
 
