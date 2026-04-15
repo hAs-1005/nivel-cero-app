@@ -43,29 +43,50 @@ def mostrar_graficos(df, habitos):
     if habitos and not df.empty:
         st.divider()
         st.subheader("📊 ANALÍTICA DE RENDIMIENTO")
-        col1, col2 = st.columns([2, 1])
         
-        with col1:
-            # 1. Gráfico de Líneas: Evolución Semanal
-            df_plot = df.copy()
-            df_plot['fecha'] = pd.to_datetime(df_plot['fecha'])
-            df_plot['Semana'] = df_plot['fecha'].dt.isocalendar().week
-            res_s = df_plot.groupby('Semana')[habitos].mean() * 100
-            st.plotly_chart(px.line(res_s, markers=True, template="plotly_dark", 
-                                  title="Evolución Semanal por Hábito (%)",
-                                  labels={'value': '% Logro', 'Semana': 'Semana del Año'}), 
-                          use_container_width=True)
+        # 1. Gráfico de Líneas (Arriba, a todo lo ancho)
+        df_plot = df.copy()
+        df_plot['fecha'] = pd.to_datetime(df_plot['fecha'])
+        df_plot['Semana'] = df_plot['fecha'].dt.isocalendar().week
+        res_s = df_plot.groupby('Semana')[habitos].mean() * 100
+        st.plotly_chart(px.line(res_s, markers=True, template="plotly_dark", 
+                              title="Evolución Semanal (%)",
+                              labels={'value': '% Logro', 'Semana': 'Semana'}), 
+                      use_container_width=True)
+        
+        st.write("---")
+        
+        # 2. COMPARATIVA Y SCORE (En dos columnas)
+        col_bar, col_pie = st.columns([2, 1])
+        
+        with col_bar:
+            # Calculamos el promedio por hábito
+            res_h = df[habitos].mean() * 100
+            # Creamos un DataFrame para Plotly Express
+            df_barras = pd.DataFrame({
+                'Hábito': res_h.index,
+                'Cumplimiento': res_h.values
+            }).sort_values(by='Cumplimiento', ascending=False)
             
-            # 2. NUEVO: Gráfico de Barras - Comparativa Individual
-            st.write("---")
-            res_h = df[habitos].mean().sort_values(ascending=True) * 100
-            fig_bar = px.bar(x=res_h.values, y=res_h.index, orientation='h',
-                            template="plotly_dark", title="Podio de Consistencia por Hábito",
-                            labels={'x': '% Total de Cumplimiento', 'y': 'Hábito'},
-                            color=res_h.values, color_continuous_scale='Greens')
+            # Gráfico de Barras Vertical con ajuste automático
+            fig_bar = px.bar(df_barras, x='Hábito', y='Cumplimiento',
+                            template="plotly_dark", 
+                            title="Comparativa de Consistencia",
+                            color='Cumplimiento',
+                            color_continuous_scale='Viridis',
+                            text_auto='.1f') # Muestra el porcentaje sobre la barra
+            
+            # Ajuste de diseño para que las barras no sean gigantes
+            fig_bar.update_layout(bargap=0.3) # Espacio entre barras
             st.plotly_chart(fig_bar, use_container_width=True)
             
-        with col2:
+        with col_pie:
+            score = df[habitos].mean().mean() * 100
+            fig_pie = go.Figure(go.Pie(labels=['Logrado', 'Pendiente'], values=[score, 100-score], 
+                                 hole=.7, marker_colors=['#00ffcc', '#333333']))
+            fig_pie.update_layout(template="plotly_dark", showlegend=False, title="Score Global",
+                            annotations=[dict(text=f'{int(score)}%', showarrow=False, font_size=25)])
+            st.plotly_chart(fig_pie, use_container_width=True)
             # 3. Gráfico de Dona: Score Global del Mes
             score = df[habitos].mean().mean() * 100
             fig = go.Figure(go.Pie(labels=['Logrado', 'Pendiente'], values=[score, 100-score], 
